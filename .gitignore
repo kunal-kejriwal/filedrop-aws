@@ -1,0 +1,11 @@
+.venv/
+cdk.out/
+cdk.context.json
+load_test_results.json
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
