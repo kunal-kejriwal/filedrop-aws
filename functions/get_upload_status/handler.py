@@ -65,11 +65,14 @@ def lambda_handler(event: dict, _context) -> dict:  # noqa: ANN001
     if item is None:
         return _response(404, {"error": "unknown upload_id"})
 
+    # DDB values come back as a broad union; extract + cast explicitly so mypy
+    # (and any future reader) can see what we actually expect at runtime.
     status = str(item.get("status", ""))
+    size_raw = item.get("actual_size") or item.get("declared_size") or 0
     body: dict[str, Any] = {
         "status": status,
         "filename": str(item.get("filename", "")),
-        "size_bytes": int(item.get("actual_size") or item.get("declared_size") or 0),
+        "size_bytes": int(size_raw),  # type: ignore[arg-type]
         "content_type": str(item.get("actual_content_type") or item.get("content_type") or ""),
     }
 
