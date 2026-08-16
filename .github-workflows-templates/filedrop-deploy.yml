@@ -1,0 +1,73 @@
+# Filedrop deploy — GitHub OIDC → AWS role → `cdk deploy`.
+# Copy this to .github/workflows/filedrop-deploy.yml at the repo root.
+#
+# Prerequisites (one-time):
+#   1. Create an IAM role in your AWS account with a trust policy that permits
+#      the GitHub OIDC provider to assume it. See docs/architecture.md
+#      "GitHub OIDC trust policy" section for the exact JSON.
+#   2. Store the role ARN in a repository secret named AWS_DEPLOY_ROLE_ARN.
+#   3. Store the SES-verified sender in a secret named SENDER_EMAIL.
+#   4. (optional) Store an ops email in ALARM_EMAIL for DLQ alerts.
+name: filedrop-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "filedrop-aws/**"
+      - ".github/workflows/filedrop-deploy.yml"
+
+concurrency:
+  group: filedrop-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+defaults:
+  run:
+    working-directory: filedrop-aws
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Set up Node (for CDK CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk@2
+
+      - name: cdk deploy --all
+        env:
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          ALARM_EMAIL: ${{ secrets.ALARM_EMAIL }}
+        run: |
+          uv run cdk deploy --all --require-approval never \
+            --context senderEmail="$SENDER_EMAIL" \
+            ${ALARM_EMAIL:+--context alarmEmail="$ALARM_EMAIL"}
