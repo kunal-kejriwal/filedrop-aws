@@ -1,5 +1,6 @@
 .venv/
 cdk.out/
+.build/
 cdk.context.json
 load_test_results.json
 __pycache__/

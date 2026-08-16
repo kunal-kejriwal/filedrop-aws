@@ -50,6 +50,7 @@ def main() -> None:
         env=env,
         uploads_bucket=core.uploads_bucket,
         uploads_table=core.uploads_table,
+        email_index_table=core.email_index_table,
     )
 
     app.synth()

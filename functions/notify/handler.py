@@ -101,33 +101,55 @@ def _process_record(body: str) -> None:
         expires_at=expires_at,
     )
 
-    _ses.send_email(
-        Source=SENDER_EMAIL,
-        Destination={"ToAddresses": [email]},
-        Message={
-            "Subject": {"Data": "Your file is ready — Filedrop", "Charset": "UTF-8"},
-            "Body": {
-                "Text": {"Data": text, "Charset": "UTF-8"},
-                "Html": {"Data": html, "Charset": "UTF-8"},
+    # SES may refuse the send in two "not really a bug" cases we want to swallow:
+    #   * MessageRejected — sandbox mode + recipient email not verified
+    #   * AccessDenied    — same effect from a stricter identity policy
+    # Both mean "we can't email this person right now" but the pipeline itself
+    # ran fine; the browser demo picks up the download URL by polling the
+    # get_upload_status endpoint, so email is a bonus, not a hard dependency.
+    # We still flip status to NOTIFIED so audit + idempotency invariants hold,
+    # tagging with a delivery_status column so we can distinguish later.
+    delivery_status = "sent"
+    try:
+        _ses.send_email(
+            Source=SENDER_EMAIL,
+            Destination={"ToAddresses": [email]},
+            Message={
+                "Subject": {"Data": "Your file is ready — Filedrop", "Charset": "UTF-8"},
+                "Body": {
+                    "Text": {"Data": text, "Charset": "UTF-8"},
+                    "Html": {"Data": html, "Charset": "UTF-8"},
+                },
             },
-        },
-    )
+        )
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("MessageRejected", "AccessDenied"):
+            logger.info("ses_recipient_unverified", extra={"code": code, "email": email})
+            delivery_status = f"skipped:{code}"
+        else:
+            raise
 
     # Same conditional pattern as process: only the first delivery flips
     # UPLOADED → NOTIFIED. Duplicate deliveries are dropped silently.
     try:
         _ddb.update_item(
             Key={"upload_id": upload_id},
-            UpdateExpression="SET #s = :n, notified_at = :t",
+            UpdateExpression=(
+                "SET #s = :n, notified_at = :t, delivery_status = :d"
+            ),
             ConditionExpression="#s = :u",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={
                 ":n": UploadStatus.NOTIFIED.value,
                 ":u": UploadStatus.UPLOADED.value,
                 ":t": datetime.now(UTC).isoformat(),
+                ":d": delivery_status,
             },
         )
-        logger.info("notified", extra={"email": email})
+        logger.info(
+            "notified", extra={"email": email, "delivery_status": delivery_status}
+        )
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             logger.info("duplicate_notify_suppressed")

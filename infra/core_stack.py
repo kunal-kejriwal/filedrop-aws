@@ -93,6 +93,19 @@ class FiledropCoreStack(cdk.Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # Email-index table — anti-abuse gate for the public demo.
+        # request_upload does a conditional PutItem here before creating a slot;
+        # a duplicate within the TTL window is rejected with HTTP 429. TTL clears
+        # the row after 24h so genuine users can retry.
+        self.email_index_table = ddb.Table(
+            self,
+            "EmailIndexTable",
+            partition_key=ddb.Attribute(name="email", type=ddb.AttributeType.STRING),
+            billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
+            time_to_live_attribute="ttl",
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # ---------------------------------------------------------------- messaging
         events_topic = sns.Topic(self, "EventsTopic", topic_name="filedrop-events")
 
@@ -304,6 +317,7 @@ class FiledropCoreStack(cdk.Stack):
         # ---------------------------------------------------------------- outputs
         cdk.CfnOutput(self, "UploadsBucketName", value=self.uploads_bucket.bucket_name)
         cdk.CfnOutput(self, "UploadsTableName", value=self.uploads_table.table_name)
+        cdk.CfnOutput(self, "EmailIndexTableName", value=self.email_index_table.table_name)
         cdk.CfnOutput(self, "AuditTableName", value=self.audit_table.table_name)
         cdk.CfnOutput(self, "EventsTopicArn", value=events_topic.topic_arn)
         cdk.CfnOutput(self, "AlarmsTopicArn", value=alarms_topic.topic_arn)
