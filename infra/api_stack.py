@@ -123,16 +123,12 @@ class FiledropApiStack(cdk.Stack):
         http_api.add_routes(
             path="/uploads",
             methods=[apigwv2.HttpMethod.POST],
-            integration=apigwv2_int.HttpLambdaIntegration(
-                "RequestUploadIntegration", request_fn
-            ),
+            integration=apigwv2_int.HttpLambdaIntegration("RequestUploadIntegration", request_fn),
         )
         http_api.add_routes(
             path="/uploads/{upload_id}/status",
             methods=[apigwv2.HttpMethod.GET],
-            integration=apigwv2_int.HttpLambdaIntegration(
-                "GetUploadStatusIntegration", status_fn
-            ),
+            integration=apigwv2_int.HttpLambdaIntegration("GetUploadStatusIntegration", status_fn),
         )
 
         cdk.CfnOutput(self, "ApiUrl", value=http_api.api_endpoint)

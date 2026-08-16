@@ -69,12 +69,8 @@ def lambda_handler(event: dict, _context) -> dict:  # noqa: ANN001
     body: dict[str, Any] = {
         "status": status,
         "filename": str(item.get("filename", "")),
-        "size_bytes": int(
-            item.get("actual_size") or item.get("declared_size") or 0
-        ),
-        "content_type": str(
-            item.get("actual_content_type") or item.get("content_type") or ""
-        ),
+        "size_bytes": int(item.get("actual_size") or item.get("declared_size") or 0),
+        "content_type": str(item.get("actual_content_type") or item.get("content_type") or ""),
     }
 
     if status == UploadStatus.REJECTED.value:

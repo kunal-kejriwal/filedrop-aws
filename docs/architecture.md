@@ -60,7 +60,7 @@ Each function is bundled by CDK via `lambda.Code.from_asset(..., bundling=...)`,
 
 ## GitHub OIDC trust policy
 
-The deploy workflow uses GitHub's OIDC provider — no long-lived access keys. Create an IAM role in AWS with this trust policy (edit the placeholders):
+The deploy workflow uses GitHub's OIDC provider — no long-lived access keys. Create an IAM role in AWS with this trust policy (edit the two placeholders marked **EDIT ME**):
 
 ```json
 {
@@ -77,7 +77,7 @@ The deploy workflow uses GitHub's OIDC provider — no long-lived access keys. C
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:kunalkejriwal/kunalships:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:YOUR-GH-ORG/YOUR-REPO-NAME:ref:refs/heads/main"
         }
       }
     }
@@ -85,7 +85,12 @@ The deploy workflow uses GitHub's OIDC provider — no long-lived access keys. C
 }
 ```
 
-**EDIT ME**: replace `REPLACE_ACCOUNT_ID` and the `kunalkejriwal/kunalships` repo path with your own. The `sub` claim restricts assumption to the main branch — narrower than `repo:kunalkejriwal/kunalships:*` which would allow any branch/PR.
+**EDIT ME**:
+
+- Replace `REPLACE_ACCOUNT_ID` with your 12-digit AWS account ID.
+- Replace `YOUR-GH-ORG/YOUR-REPO-NAME` with the **exact** `owner/repo` slug from GitHub — case- and character-sensitive. For example `kunal-kejriwal/kunalships` (**with the dash**), not `kunalkejriwal/kunalships`. Getting this wrong produces `sts:AssumeRoleWithWebIdentity: Not authorized` errors in the deploy job.
+
+The `sub` claim above restricts assumption to the `main` branch of exactly one repo. To allow any branch/PR from that repo, use `repo:YOUR-GH-ORG/YOUR-REPO-NAME:*` instead. To debug what value GitHub actually sends, add a step `echo $ACTIONS_ID_TOKEN_REQUEST_TOKEN` in the workflow (it's the JWT you can decode).
 
 Attach a policy to the role granting the minimum CloudFormation + service actions needed for `cdk deploy` (S3, DynamoDB, SNS, SQS, Lambda, IAM, API Gateway v2, EventBridge, SES, CloudWatch, X-Ray). For a portfolio project, `PowerUserAccess` + `IAMFullAccess` gets you there fast; tighten in production.
 

@@ -135,9 +135,7 @@ def _process_record(body: str) -> None:
     try:
         _ddb.update_item(
             Key={"upload_id": upload_id},
-            UpdateExpression=(
-                "SET #s = :n, notified_at = :t, delivery_status = :d"
-            ),
+            UpdateExpression=("SET #s = :n, notified_at = :t, delivery_status = :d"),
             ConditionExpression="#s = :u",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={
@@ -147,9 +145,7 @@ def _process_record(body: str) -> None:
                 ":d": delivery_status,
             },
         )
-        logger.info(
-            "notified", extra={"email": email, "delivery_status": delivery_status}
-        )
+        logger.info("notified", extra={"email": email, "delivery_status": delivery_status})
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             logger.info("duplicate_notify_suppressed")
