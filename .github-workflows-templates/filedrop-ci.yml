@@ -33,6 +33,9 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          # The project lives in filedrop-aws/, not at repo root, so the
+          # default glob (**/uv.lock) fails checkout validation. Pin it.
+          cache-dependency-glob: "filedrop-aws/uv.lock"
 
       - name: Install dependencies
         run: uv sync --extra dev
